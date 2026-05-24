@@ -1,0 +1,16 @@
+proyecto-club-elo/
+├── index.html          # Página principal pública
+├── admin.html          # Panel de administración
+├── funtions/
+│   ├── index.js
+├── css/
+│   ├── styles.css      # Estilos generales
+│   └── admin.css       # Estilos específicos para el panel admin
+├── public/
+├── js/
+│   ├── firebase-config.js  # Configuración de Firebase
+│   ├── auth.js         # Manejo de autenticación
+│   ├── database.js     # Funciones para interactuar con Firestore
+│   ├── app.js          # Lógica para la página principal
+│   └── admin.js        # Lógica para el panel de administración
+└── README.md           # Documentación del proyecto

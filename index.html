@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club de Ajedrez Sierra Norte - Rankings ELO</title> <!-- Título Actualizado -->
+    <link rel="stylesheet" href="css/styles.css"> <!-- Estilos Generales -->
+    <!-- No necesita admin.css -->
+</head>
+<body>
+    <header>
+        <div class="container">
+            <!-- Logo y Título Actualizado -->
+            <div class="logo-container">
+                 <img src="img/logo.jpeg" alt="Logo Club Sierra Norte" id="header-logo"> <!-- Revisa ruta/extensión -->
+                 <h1>Club de Ajedrez Sierra Norte - ELO</h1>
+            </div>
+            <!-- Navegación Eliminada -->
+            <!-- <nav> ... </nav> -->
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Sección de Búsqueda -->
+        <section class="search-section">
+            <div class="search-container">
+                <input type="text" id="search-player" placeholder="Buscar jugador...">
+            </div>
+        </section>
+
+        <!-- Sección de Ranking -->
+        <section class="ranking-section">
+            <h2>Ranking de Jugadores</h2>
+            <p>Haz clic en una fila para ver el perfil FIDE del jugador (si está disponible).</p>
+            <table id="players-table">
+                <thead>
+                    <tr>
+                        <th>Posición</th>
+                        <th>Nombre</th>
+                        <th>ELO</th>
+                        <!-- Columna 'Última actualización' Eliminada -->
+                    </tr>
+                </thead>
+                <tbody id="players-list">
+                    <!-- Los jugadores se cargarán dinámicamente con JavaScript -->
+                    <!-- El colspan del mensaje de carga se ajustará automáticamente por JS -->
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+             <!-- Footer Actualizado -->
+            <p> <span id="current-year"></span> Club de Ajedrez Sierra Norte.</p>
+        </div>
+    </footer>
+
+    <!-- Firebase SDK (Necesarios para leer datos) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <!-- Auth NO es estrictamente necesario aquí, pero lo dejamos por si se usa isUserLoggedIn para algo más -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+    <!-- Scripts de la aplicación -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/database.js"></script> <!-- Necesario para listenForPlayerUpdates y search -->
+    <script src="js/auth.js"></script>     <!-- Necesario para checkAuthState -->
+    <script src="js/app.js"></script>      <!-- Lógica específica de esta página (Modificada) -->
+</body>
+</html>

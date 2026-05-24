@@ -1,0 +1,154 @@
+/* admin.css - Estilos específicos para la administración */
+
+/* Sección de Autenticación */
+#auth-section {
+    max-width: 600px;
+    margin: 2rem auto; /* Más margen superior */
+}
+
+/* Panel de Administración General */
+#admin-panel {
+    /* Estilos generales del panel si son necesarios */
+}
+
+/* Cabecera del Panel de Admin */
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap; /* Para que se adapte en pantallas pequeñas */
+    gap: 1rem;       /* Espacio entre título y grupo de botones */
+}
+
+.admin-header h2 {
+    margin: 0; /* Quitar margen por defecto del h2 */
+}
+
+/* Contenedor de botones en la cabecera */
+.admin-header-buttons {
+    display: flex;
+    align-items: center; /* Alinear botones y span verticalmente */
+    gap: 0.75rem; /* Espacio entre botones y span */
+    flex-wrap: wrap; /* Adaptación móvil */
+}
+
+/* Span para mostrar estado de actualización */
+#update-all-status {
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-weight: 500;
+    /* display: inline-block; Es gestionado por JS */
+    vertical-align: middle; /* Alinear con los botones */
+    transition: background-color 0.3s ease, color 0.3s ease; /* Suavizar cambio de color */
+}
+
+/* Estilos específicos por estado (Clases añadidas por JS) */
+.status-processing {
+    background-color: #e2e3e5; /* Gris claro */
+    color: #383d41;      /* Gris oscuro */
+    border: 1px solid #d6d8db;
+}
+
+.status-success {
+    background-color: #d4edda; /* Verde pálido */
+    color: #155724;      /* Verde oscuro */
+    border: 1px solid #c3e6cb;
+}
+
+.status-error {
+    background-color: #f8d7da; /* Rojo pálido */
+    color: #721c24;      /* Rojo oscuro */
+    border: 1px solid #f5c6cb;
+}
+
+
+/* Secciones dentro del Panel */
+.admin-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background-color: #f9f9f9; /* Fondo ligeramente diferente */
+    border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.admin-section h3 {
+    margin-top: 0; /* Quitar espacio superior si lo hubiera */
+    margin-bottom: 1rem;
+    color: #2c3e50; /* Color oscuro para títulos */
+}
+
+/* Tabla de Jugadores */
+#admin-players-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+#admin-players-table th,
+#admin-players-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    vertical-align: middle; /* Alinear contenido verticalmente */
+}
+
+#admin-players-table th {
+    background-color: #f2f2f2;
+    font-weight: 600;
+}
+
+#admin-players-table tr:hover {
+    background-color: #f5f5f5; /* Resaltar fila al pasar el ratón */
+}
+
+/* Estilo específico para enlaces FIDE ID en la tabla */
+#admin-players-table td a {
+    color: #3498db; /* Azul enlace */
+    text-decoration: none;
+    font-weight: 500;
+}
+#admin-players-table td a:hover {
+    text-decoration: underline;
+    color: #2980b9; /* Azul más oscuro */
+}
+
+
+/* Contenedor de botones de acción en la tabla */
+.action-btns {
+   text-align: center; /* Centrar botón de eliminar */
+}
+
+/* Botón Eliminar (específico) */
+.delete-btn {
+    background-color: #e74c3c; /* Rojo */
+    color: #fff;
+    /* Hereda padding, border-radius, etc. de la clase .btn (definida en styles.css) */
+}
+
+.delete-btn:hover {
+    background-color: #c0392b; /* Rojo más oscuro */
+}
+
+/* Formularios dentro de las secciones */
+.form-group {
+    margin-bottom: 1rem;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"] {
+    width: 100%;
+    padding: 0.7rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+.form-buttons {
+    margin-top: 1.5rem;
+}

@@ -1,0 +1,157 @@
+/* styles.css - Estilos generales */
+
+/* ... (tus estilos existentes para body, header, .container, .logo-container, #header-logo, etc.) ... */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f4f4f4;
+    margin: 0;
+}
+
+.container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 15px; /* Algo de padding lateral */
+}
+
+header {
+    background-color: #2c3e50; /* Azul oscuro */
+    color: #fff;
+    padding: 1rem 0;
+    margin-bottom: 2rem; /* Separar header del contenido */
+}
+
+header .container {
+    display: flex;
+    justify-content: space-between; /* Empuja logo/título a la izq, nav(eliminado) a la der */
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem; /* Espacio logo-h1 */
+}
+
+#header-logo {
+    height: 50px; /* Ajusta tamaño */
+    width: auto;
+    display: block;
+}
+
+header h1 {
+    font-size: 1.6rem; /* Ajusta tamaño */
+    margin: 0;
+    font-weight: 500; /* Un poco menos grueso */
+}
+
+/* Sección de Búsqueda */
+.search-section {
+    background-color: #fff;
+    border-radius: 5px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.search-container {
+    display: flex;
+    justify-content: flex-end; /* Alinea la barra a la derecha */
+}
+
+#search-player {
+    padding: 0.7rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 100%; /* Ocupar más espacio en móvil */
+    max-width: 350px; /* Ancho máximo en escritorio */
+    font-size: 1rem;
+}
+
+/* Sección de Ranking */
+.ranking-section {
+    background-color: #fff;
+    border-radius: 5px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.ranking-section h2 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+}
+.ranking-section p {
+    margin-bottom: 1.5rem;
+    font-size: 0.9em;
+    color: #555;
+}
+
+
+/* Tabla de Rankings */
+#players-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+#players-table th,
+#players-table td {
+    padding: 0.8rem 1rem; /* Un poco más de padding */
+    text-align: left;
+    border-bottom: 1px solid #eee; /* Borde más suave */
+}
+
+#players-table th {
+    background-color: #f8f9fa; /* Fondo cabecera más claro */
+    font-weight: 600;
+    color: #495057;
+}
+
+/* --- ESTILO ZEBRA STRIPING --- */
+#players-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9; /* Color para filas pares */
+}
+
+/* --- ESTILO PARA FILAS CLICABLES (HOVER) --- */
+#players-table tbody tr.clickable-row:hover {
+    background-color: #e9ecef; /* Color de fondo al pasar el ratón */
+    cursor: pointer; /* Ya puesto en JS, pero CSS lo refuerza */
+}
+
+
+/* Footer */
+footer {
+    background-color: #2c3e50;
+    color: #bdc3c7; /* Color de texto más suave */
+    text-align: center;
+    padding: 1.5rem 0;
+    margin-top: 3rem;
+    font-size: 0.9em;
+}
+
+/* Responsive (Opcional pero recomendado) */
+@media (max-width: 768px) {
+    header .container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    header h1 {
+        font-size: 1.3rem;
+    }
+    #header-logo {
+        height: 40px;
+    }
+    #search-player {
+        max-width: none; /* Ocupar todo el ancho disponible */
+    }
+     #players-table th,
+     #players-table td {
+        padding: 0.6rem 0.5rem; /* Menos padding en móvil */
+        font-size: 0.9rem;
+     }
+}
