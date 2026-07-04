@@ -67,3 +67,13 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Service account de Firebase para el script de sincronizacion local
+# (NO subir al repo - es un secret)
+scripts/firebase-sa.json
+
+# Logs del script de sincronizacion
+scripts/logs/
+
+# Dependencias del script de sincronizacion
+scripts/node_modules/

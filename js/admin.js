@@ -17,7 +17,6 @@ const updateAllStatusElement = document.getElementById('update-all-status'); // 
 
 // Variables globales
 let unsubscribeFirestoreListener = null; // Listener de Firestore
-let triggerEloSyncFunction = null; // Referencia a Cloud Function
 
 // Inicialización al cargar el DOM
 document.addEventListener('DOMContentLoaded', function () {
@@ -25,9 +24,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (currentYearElement) {
         currentYearElement.textContent = new Date().getFullYear();
     }
-    // Verifica estado de auth al cargar y establece la UI inicial
     checkAuthState(updateUIForAuthState);
-    // Configura listeners de botones (se activarán/desactivarán en updateUI)
     setupEventListeners();
 });
 
@@ -42,31 +39,6 @@ function setupEventListeners() {
     console.log("Event listeners configurados.");
 }
 
-// Inicializa las referencias a las Cloud Functions (llamada solo cuando está logueado)
-function initializeFirebaseFunctions() {
-    if (triggerEloSyncFunction) {
-        console.log("Ref a Cloud Function ya inicializada.");
-        return;
-    }
-    console.log("Inicializando referencias a Cloud Functions...");
-    try {
-        if (firebase && typeof firebase.functions === 'function') {
-            const functions = firebase.app().functions('europe-west1');
-            triggerEloSyncFunction = functions.httpsCallable('triggerEloSync', { timeout: 30000 });
-            console.log("Ref a 'triggerEloSync' OK.");
-            if (addPlayerBtn) addPlayerBtn.disabled = false;
-            if (updateAllBtn) updateAllBtn.disabled = false;
-        } else {
-            throw new Error("SDK de Firebase Functions no está cargado o inicializado.");
-        }
-    } catch (error) {
-        console.error("Error CRÍTICO al inicializar Firebase Functions:", error);
-        alert("Error de Configuración: No se pudo conectar con las funciones del servidor. Algunas acciones estarán deshabilitadas.");
-        if (addPlayerBtn) addPlayerBtn.disabled = true;
-        if (updateAllBtn) updateAllBtn.disabled = true;
-    }
-}
-
 // --- Funciones de Autenticación ---
 function handleLogin() {
     console.log("Intentando iniciar sesión...");
@@ -78,31 +50,24 @@ function handleLogin() {
     }
     loginBtn.disabled = true;
     loginBtn.textContent = 'Iniciando sesión...';
-    // Llama a loginUser de auth.js
     loginUser(email, password)
         .catch(error => {
-            // Manejo de errores de login
             console.error('Error detallado al iniciar sesión:', error);
             alert(`Error al iniciar sesión: ${mapAuthError(error.code)}`);
-            // Solo re-habilitar botón en caso de error
             loginBtn.disabled = false;
             loginBtn.textContent = 'Iniciar Sesión';
         });
-    // En caso de éxito, updateUIForAuthState se encargará de la UI
 }
 
 function handleLogout() {
     console.log("Cerrando sesión...");
-    // Llama a logoutUser de auth.js
     logoutUser()
         .catch(error => {
             console.error('Error al cerrar sesión:', error);
             alert(`Error al cerrar sesión: ${error.message}`);
         });
-    // updateUIForAuthState limpiará la UI
 }
 
-// Mapea códigos de error de Firebase Auth a mensajes amigables
 function mapAuthError(errorCode) {
     switch (errorCode) {
         case 'auth/invalid-email': return 'El formato del correo electrónico no es válido.';
@@ -115,8 +80,10 @@ function mapAuthError(errorCode) {
 
 // --- Lógica de Administración de Jugadores ---
 
-// Añadir/Buscar Jugador por FIDE ID
-// Crea un doc placeholder y dispara el workflow de GitHub que rellenará el ELO real.
+// Añadir Jugador por FIDE ID
+// Crea un documento placeholder en Firestore con ELO=0.
+// La sincronización automática (desde el PC del admin) rellenará el ELO real
+// la próxima vez que se ejecute el script mensual.
 async function handleAddPlayer() {
     console.log("Botón 'Añadir/Buscar Jugador' presionado.");
     const fideId = playerFideIdInput.value.trim();
@@ -124,33 +91,20 @@ async function handleAddPlayer() {
         alert('Por favor, ingresa el ID FIDE numérico del jugador.');
         return;
     }
-    if (!triggerEloSyncFunction) {
-        alert("Error: la función no está lista. Recarga la página.");
-        return;
-    }
 
     addPlayerBtn.disabled = true;
     addPlayerBtn.textContent = 'Añadiendo...';
 
     try {
-        // 1. ¿Ya existe?
         const exists = await playerExistsByFideId(fideId);
         if (exists) {
             alert('Este jugador ya está registrado.');
             return;
         }
-        // 2. Crea placeholder en Firestore
         await addPlayerByFideIdPlaceholder(fideId);
         console.log(`Placeholder creado para FIDE ID ${fideId}.`);
-        // 3. Dispara el workflow para ese ID (scraping directo en GitHub)
-        const r = await triggerEloSyncFunction({ mode: 'scrape', targetIds: String(fideId) });
-        console.log('Respuesta triggerEloSync:', r.data);
-        if (r.data && r.data.success) {
-            alert(`Jugador añadido. Su ELO aparecerá automaticamente en ~30s.`);
-            playerFideIdInput.value = '';
-        } else {
-            alert(`Jugador creado pero el workflow no se disparó: ${r.data?.message || 'desconocido'}`);
-        }
+        alert(`Jugador añadido. Su ELO se actualizará automáticamente en la próxima sincronización mensual (día 1-12 del mes).`);
+        playerFideIdInput.value = '';
     } catch (error) {
         console.error('Error añadiendo jugador:', error);
         alert(`Error: ${error.message}`);
@@ -167,12 +121,10 @@ function handleDeletePlayer(playerId, playerName) {
 
     if (confirm(`¿Estás SEGURO de que quieres eliminar a ${nameForConfirm}? Esta acción no se puede deshacer.`)) {
         console.log(`Confirmado. Eliminando jugador ${playerId}...`);
-        // Llama a la función 'deletePlayer' definida en database.js
         deletePlayer(playerId)
             .then(() => {
                 console.log(`Jugador ${playerId} eliminado.`);
                 alert('Jugador eliminado con éxito.');
-                // La tabla se refrescará automáticamente por el listener.
             })
             .catch(error => {
                 console.error(`Error al eliminar jugador ${playerId}:`, error);
@@ -190,27 +142,24 @@ function renderAdminPlayersList(players) {
         console.error("Elemento 'admin-players-list' (tbody) no encontrado.");
         return;
     }
-    adminPlayersList.innerHTML = ''; // Limpiar tabla
+    adminPlayersList.innerHTML = '';
 
     if (!players || players.length === 0) {
         adminPlayersList.innerHTML = '<tr><td colspan="4">No hay jugadores registrados.</td></tr>';
         return;
     }
 
-    // Ordenar por ELO (Firestore ya debería hacerlo, pero doble check)
     const sortedPlayers = [...players].sort((a, b) => (b.elo || 0) - (a.elo || 0));
 
     sortedPlayers.forEach(player => {
         const row = document.createElement('tr');
-        row.dataset.playerId = player.id; // Guardar ID por si acaso
+        row.dataset.playerId = player.id;
 
         const displayName = player.name || '(Sin nombre)';
-        // Escapar comillas en nombre para que no rompa el string del onclick
         const safeDisplayName = displayName.replace(/'/g, "\\'");
         const displayElo = (player.elo !== undefined && player.elo !== null) ? player.elo : 'N/A';
-        const fideId = player.fideId; // Obtener el FIDE ID
+        const fideId = player.fideId;
 
-        // Crear contenido para la celda FIDE ID (enlace o texto)
         let fideIdCellContent;
         if (fideId) {
             const fideProfileUrl = `https://ratings.fide.com/profile/${fideId}`;
@@ -219,11 +168,10 @@ function renderAdminPlayersList(players) {
             fideIdCellContent = 'No asignado';
         }
 
-        // Construir la fila HTML
         row.innerHTML = `
             <td>${displayName}</td>
             <td>${displayElo}</td>
-            <td>${fideIdCellContent}</td> 
+            <td>${fideIdCellContent}</td>
             <td class="action-btns">
                 <button
                     class="delete-btn btn"
@@ -237,75 +185,31 @@ function renderAdminPlayersList(players) {
     });
 }
 
-// Maneja el clic en "Actualizar Todos (FIDE)" dispara el workflow de GitHub
-async function handleManualUpdateAll() {
+// Maneja el clic en "Actualizar Todos (FIDE)"
+// Ahora informativo: la sincronización se hace automáticamente desde el PC del admin
+// (Programador de Tareas de Windows). Aquí solo se informa.
+function handleManualUpdateAll() {
     console.log("Botón 'Actualizar Todos (FIDE)' presionado.");
-    if (!triggerEloSyncFunction) {
-        alert("Error: la función no está lista. Recarga la página.");
+    if (!confirm("La sincronización de ELOs se realiza automáticamente desde el PC del administrador (día 1-12 de cada mes).\n\n¿Quieres forzarla AHORA? Debes ejecutar en tu PC:\n\n  D:\\Visual Studio Projects\\ELO Sierra Norte\\scripts\\run-sync.bat --force\n\n(El panel web no puede forzarla directamente.)")) {
         return;
-    }
-    if (!confirm("¿Iniciar sincronización con FIDE? Los ELOs se actualizarán en ~30-60s.")) {
-        return;
-    }
-
-    if (updateAllBtn) {
-        updateAllBtn.disabled = true;
-        updateAllBtn.textContent = 'Disparando workflow...';
     }
     if (updateAllStatusElement) {
-        updateAllStatusElement.textContent = 'Sincronización en curso... ⏳';
+        updateAllStatusElement.textContent = 'Para forzar: ejecuta scripts\\run-sync.bat --force en tu PC.';
         updateAllStatusElement.className = 'status-processing';
         updateAllStatusElement.style.display = 'inline-block';
+        setTimeout(() => { if (updateAllStatusElement) updateAllStatusElement.style.display = 'none'; }, 8000);
     }
-
-    try {
-        const r = await triggerEloSyncFunction({ mode: 'auto' });
-        if (r.data && r.data.success) {
-            if (updateAllStatusElement) {
-                updateAllStatusElement.textContent = `Sincronización iniciada. Refrescando en ~1 min... 👍`;
-                updateAllStatusElement.className = 'status-success';
-            }
-            alert('Sincronización iniciada. Los ELOs aparecerán automaticamente en ~30-60s.');
-        } else {
-            if (updateAllStatusElement) {
-                updateAllStatusElement.textContent = `Error: ${r.data?.message || ''} ❌`;
-                updateAllStatusElement.className = 'status-error';
-            }
-            alert(`Error: ${r.data?.message || 'desconocido'}`);
-        }
-    } catch (error) {
-        console.error('Error disparando workflow:', error);
-        if (updateAllStatusElement) {
-            updateAllStatusElement.textContent = `Error: ${error.message} 🔌`;
-            updateAllStatusElement.className = 'status-error';
-        }
-        alert(`Error: ${error.message}`);
-    } finally {
-        if (updateAllBtn) {
-            updateAllBtn.disabled = false;
-            updateAllBtn.textContent = 'Actualizar Todos (FIDE)';
-        }
-        setTimeout(() => {
-            if (updateAllStatusElement) {
-                updateAllStatusElement.style.display = 'none';
-            }
-        }, 8000);
-    }
+    alert('Para forzar la sincronización ahora, ejecuta en tu PC:\n\n  D:\\Visual Studio Projects\\ELO Sierra Norte\\scripts\\run-sync.bat --force\n\nLos ELOs se actualizarán en ~30 segundos.');
 }
 
 // Actualiza la interfaz de usuario según el estado de autenticación
 function updateUIForAuthState(user) {
     console.log("Actualizando UI por Auth State. User:", user ? user.email : 'null');
     if (user) {
-        // --- Usuario AUTENTICADO ---
         if (authSection) authSection.style.display = 'none';
         if (adminPanel) adminPanel.style.display = 'block';
-        // Limpiar campos de login residuales
         if (emailInput) emailInput.value = '';
         if (passwordInput) passwordInput.value = '';
-
-        // Inicializar referencias a Cloud Functions AHORA que está logueado
-        initializeFirebaseFunctions();
 
         // Configurar listener de Firestore para la tabla de jugadores
         if (unsubscribeFirestoreListener) {
@@ -313,49 +217,34 @@ function updateUIForAuthState(user) {
             unsubscribeFirestoreListener();
         }
         console.log("Estableciendo NUEVO listener Firestore...");
-        // La función listenForPlayerUpdates debe venir de database.js
         unsubscribeFirestoreListener = listenForPlayerUpdates(renderAdminPlayersList);
 
-        // Ocultar/limpiar estado de actualización al cargar panel
         if (updateAllStatusElement) {
             updateAllStatusElement.style.display = 'none';
             updateAllStatusElement.textContent = '';
         }
 
     } else {
-        // --- Usuario NO AUTENTICADO ---
         if (authSection) authSection.style.display = 'block';
         if (adminPanel) adminPanel.style.display = 'none';
 
-        // Cancelar listener de Firestore si existe
         if (unsubscribeFirestoreListener) {
             console.log("Usuario no autenticado. Cancelando listener Firestore.");
             unsubscribeFirestoreListener();
             unsubscribeFirestoreListener = null;
         }
-        // Limpiar tabla y campos del panel admin
         if (adminPlayersList) adminPlayersList.innerHTML = '';
         if (playerFideIdInput) playerFideIdInput.value = '';
 
-        // Limpiar estado de actualización
         if (updateAllStatusElement) {
             updateAllStatusElement.textContent = '';
             updateAllStatusElement.style.display = 'none';
-            updateAllStatusElement.className = ''; // Quitar clases de estado
+            updateAllStatusElement.className = '';
         }
-
-        // Deshabilitar botones que dependen de funciones/login
-        if (addPlayerBtn) addPlayerBtn.disabled = true;
-        if (updateAllBtn) updateAllBtn.disabled = true;
-
-        // Resetear referencias a Cloud Functions
-        triggerEloSyncFunction = null;
-        console.log("Referencias Cloud Functions reseteadas (logout).");
     }
 }
 
 // --- Exponer funciones necesarias al scope global ---
-// Necesario para que el `onclick="handleDeletePlayer(...)"` funcione
 window.handleDeletePlayer = handleDeletePlayer;
 
 console.log("admin.js cargado y configurado.");
