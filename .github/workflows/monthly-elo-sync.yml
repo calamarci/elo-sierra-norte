@@ -1,0 +1,50 @@
+name: Sync ELOs FIDE -> Firestore
+
+# Cron diario a las 05:00 UTC (decide día del mes dentro del script)
+# workflow_dispatch permite lanzarlo manualmente desde GitHub o desde el panel admin
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Modo: auto, scrape, zip"
+        type: choice
+        options: ["auto", "scrape", "zip"]
+        default: "auto"
+        required: false
+      target_ids:
+        description: "IDs FIDE específicos separados por coma (vacío = todos)"
+        required: false
+        default: ""
+      force:
+        description: "Forzar actualización ignorando lógica mensual"
+        type: boolean
+        default: false
+        required: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: scripts/package.json
+
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+        working-directory: scripts
+
+      - name: Ejecutar sincronización
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          MODE: ${{ github.event.inputs.mode || 'auto' }}
+          TARGET_IDS: ${{ github.event.inputs.target_ids || '' }}
+          FORCE: ${{ github.event.inputs.force || 'false' }}
+        run: node syncFideElos.js
+        working-directory: scripts

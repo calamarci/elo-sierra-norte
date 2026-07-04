@@ -1,0 +1,13 @@
+{
+  "name": "elo-sierra-norte-sync",
+  "version": "1.0.0",
+  "description": "Sincronización mensual de ELOs desde FIDE a Firestore (corre en GitHub Actions)",
+  "main": "syncFideElos.js",
+  "private": true,
+  "dependencies": {
+    "firebase-admin": "^11.8.0",
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0-rc.12",
+    "adm-zip": "^0.5.10"
+  }
+}

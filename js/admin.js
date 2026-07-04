@@ -17,8 +17,7 @@ const updateAllStatusElement = document.getElementById('update-all-status'); // 
 
 // Variables globales
 let unsubscribeFirestoreListener = null; // Listener de Firestore
-let addPlayerByFideIdFunction = null; // Referencia a Cloud Function
-let manualUpdateAllPlayersFunction = null; // Referencia a Cloud Function
+let triggerEloSyncFunction = null; // Referencia a Cloud Function
 
 // Inicialización al cargar el DOM
 document.addEventListener('DOMContentLoaded', function () {
@@ -45,38 +44,24 @@ function setupEventListeners() {
 
 // Inicializa las referencias a las Cloud Functions (llamada solo cuando está logueado)
 function initializeFirebaseFunctions() {
-    // Evitar re-inicialización innecesaria
-    if (addPlayerByFideIdFunction && manualUpdateAllPlayersFunction) {
-        console.log("Refs a Cloud Functions ya inicializadas.");
+    if (triggerEloSyncFunction) {
+        console.log("Ref a Cloud Function ya inicializada.");
         return;
     }
     console.log("Inicializando referencias a Cloud Functions...");
     try {
         if (firebase && typeof firebase.functions === 'function') {
-            // Asegúrate que la región coincide con la de tus funciones
             const functions = firebase.app().functions('europe-west1');
-
-            // Obtener referencias si no existen ya
-            if (!addPlayerByFideIdFunction) {
-                addPlayerByFideIdFunction = functions.httpsCallable('addPlayerByFideId');
-                console.log("Ref a 'addPlayerByFideId' OK.");
-            }
-            if (!manualUpdateAllPlayersFunction) {
-                manualUpdateAllPlayersFunction = functions.httpsCallable('manualUpdateAllPlayers', { timeout: 540000 });
-                console.log("Ref a 'manualUpdateAllPlayers' OK.");
-            }
-
-            // Habilitar botones correspondientes si las referencias son válidas
-            if (addPlayerBtn && addPlayerByFideIdFunction) addPlayerBtn.disabled = false;
-            if (updateAllBtn && manualUpdateAllPlayersFunction) updateAllBtn.disabled = false;
-
+            triggerEloSyncFunction = functions.httpsCallable('triggerEloSync', { timeout: 30000 });
+            console.log("Ref a 'triggerEloSync' OK.");
+            if (addPlayerBtn) addPlayerBtn.disabled = false;
+            if (updateAllBtn) updateAllBtn.disabled = false;
         } else {
             throw new Error("SDK de Firebase Functions no está cargado o inicializado.");
         }
     } catch (error) {
         console.error("Error CRÍTICO al inicializar Firebase Functions:", error);
         alert("Error de Configuración: No se pudo conectar con las funciones del servidor. Algunas acciones estarán deshabilitadas.");
-        // Deshabilitar botones si falla la inicialización
         if (addPlayerBtn) addPlayerBtn.disabled = true;
         if (updateAllBtn) updateAllBtn.disabled = true;
     }
@@ -130,47 +115,49 @@ function mapAuthError(errorCode) {
 
 // --- Lógica de Administración de Jugadores ---
 
-// Añadir/Buscar Jugador por FIDE ID llamando a Cloud Function
-function handleAddPlayer() {
+// Añadir/Buscar Jugador por FIDE ID
+// Crea un doc placeholder y dispara el workflow de GitHub que rellenará el ELO real.
+async function handleAddPlayer() {
     console.log("Botón 'Añadir/Buscar Jugador' presionado.");
     const fideId = playerFideIdInput.value.trim();
     if (!fideId) {
         alert('Por favor, ingresa el ID FIDE numérico del jugador.');
         return;
     }
-    // Verificar que la referencia a la función esté lista
-    if (!addPlayerByFideIdFunction) {
-        alert("Error: La función para añadir jugadores no está lista. Intenta recargar.");
-        console.error("handleAddPlayer: addPlayerByFideIdFunction es null.");
+    if (!triggerEloSyncFunction) {
+        alert("Error: la función no está lista. Recarga la página.");
         return;
     }
 
-    console.log(`Llamando a Cloud Function 'addPlayerByFideId' con FIDE ID: ${fideId}`);
     addPlayerBtn.disabled = true;
-    addPlayerBtn.textContent = 'Procesando...';
+    addPlayerBtn.textContent = 'Añadiendo...';
 
-    // Llamar a la Cloud Function
-    addPlayerByFideIdFunction({ fideId: fideId })
-        .then(result => {
-            console.log("Respuesta de 'addPlayerByFideId':", result.data);
-            if (result.data.success) {
-                alert(`Éxito: ${result.data.name} (ELO: ${result.data.elo}). ${result.data.message || 'Operación completada.'}`);
-                playerFideIdInput.value = ''; // Limpiar input
-            } else {
-                // Error lógico devuelto por la función
-                alert(`Error al añadir: ${result.data.error || 'Error desconocido devuelto por el servidor.'}`);
-            }
-        })
-        .catch(error => {
-            // Error en la llamada HTTPS
-            console.error('Error al llamar a Cloud Function (addPlayerByFideId):', error);
-            alert(`Error de Comunicación con el Servidor: ${error.message}.`);
-        })
-        .finally(() => {
-            // Volver a habilitar botón
-            addPlayerBtn.disabled = false;
-            addPlayerBtn.textContent = 'Añadir/Buscar Jugador';
-        });
+    try {
+        // 1. ¿Ya existe?
+        const exists = await playerExistsByFideId(fideId);
+        if (exists) {
+            alert('Este jugador ya está registrado.');
+            return;
+        }
+        // 2. Crea placeholder en Firestore
+        await addPlayerByFideIdPlaceholder(fideId);
+        console.log(`Placeholder creado para FIDE ID ${fideId}.`);
+        // 3. Dispara el workflow para ese ID (scraping directo en GitHub)
+        const r = await triggerEloSyncFunction({ mode: 'scrape', targetIds: String(fideId) });
+        console.log('Respuesta triggerEloSync:', r.data);
+        if (r.data && r.data.success) {
+            alert(`Jugador añadido. Su ELO aparecerá automaticamente en ~30s.`);
+            playerFideIdInput.value = '';
+        } else {
+            alert(`Jugador creado pero el workflow no se disparó: ${r.data?.message || 'desconocido'}`);
+        }
+    } catch (error) {
+        console.error('Error añadiendo jugador:', error);
+        alert(`Error: ${error.message}`);
+    } finally {
+        addPlayerBtn.disabled = false;
+        addPlayerBtn.textContent = 'Añadir Jugador';
+    }
 }
 
 // Eliminar Jugador llamando a función de database.js
@@ -250,78 +237,60 @@ function renderAdminPlayersList(players) {
     });
 }
 
-// Maneja el clic en "Actualizar Todos (FIDE)"
-function handleManualUpdateAll() {
+// Maneja el clic en "Actualizar Todos (FIDE)" dispara el workflow de GitHub
+async function handleManualUpdateAll() {
     console.log("Botón 'Actualizar Todos (FIDE)' presionado.");
-    // Verificar que la referencia a la función exista
-    if (!manualUpdateAllPlayersFunction) {
-        alert("Error: La función de actualización masiva no está lista. Intenta recargar.");
-        console.error("handleManualUpdateAll: manualUpdateAllPlayersFunction es null.");
+    if (!triggerEloSyncFunction) {
+        alert("Error: la función no está lista. Recarga la página.");
         return;
     }
-    // Confirmación del usuario
-    if (!confirm("¿Iniciar actualización masiva desde FIDE? Esto contactará a la FIDE para cada jugador con ID y puede tardar.")) {
-        console.log("Actualización masiva cancelada.");
+    if (!confirm("¿Iniciar sincronización con FIDE? Los ELOs se actualizarán en ~30-60s.")) {
         return;
     }
 
-    console.log("Llamando a Cloud Function 'manualUpdateAllPlayers'...");
-
-    // --- Actualizar UI para indicar progreso ---
     if (updateAllBtn) {
         updateAllBtn.disabled = true;
-        updateAllBtn.textContent = 'Actualizando...'; // Cambiar texto botón
+        updateAllBtn.textContent = 'Disparando workflow...';
     }
     if (updateAllStatusElement) {
-        updateAllStatusElement.textContent = 'Procesando jugadores... ⏳';
-        updateAllStatusElement.className = 'status-processing'; // Aplicar estilo CSS
-        updateAllStatusElement.style.display = 'inline-block'; // Mostrar el span
+        updateAllStatusElement.textContent = 'Sincronización en curso... ⏳';
+        updateAllStatusElement.className = 'status-processing';
+        updateAllStatusElement.style.display = 'inline-block';
     }
 
-    // Llamar a la Cloud Function 'manualUpdateAllPlayers'
-    manualUpdateAllPlayersFunction()
-        .then(result => {
-            console.log("Respuesta de 'manualUpdateAllPlayers':", result.data);
-            const message = result.data.message || (result.data.success ? 'Proceso completado.' : 'Error desconocido.');
-            if (result.data.success) {
-                // --- Mostrar Éxito ---
-                if (updateAllStatusElement) {
-                    updateAllStatusElement.textContent = `Éxito: ${message} 👍`;
-                    updateAllStatusElement.className = 'status-success';
-                }
-                alert(`Éxito: ${message}`); // Alert final de confirmación
-            } else {
-                // --- Mostrar Error (lógico de la función) ---
-                if (updateAllStatusElement) {
-                    updateAllStatusElement.textContent = `Error: ${message} ❌`;
-                    updateAllStatusElement.className = 'status-error';
-                }
-                alert(`Error Actualización: ${message}`); // Alert final de error
-            }
-        })
-        .catch(error => {
-            // --- Mostrar Error (de comunicación HTTPS) ---
-            console.error('Error llamada Cloud Function (manualUpdateAllPlayers):', error);
+    try {
+        const r = await triggerEloSyncFunction({ mode: 'auto' });
+        if (r.data && r.data.success) {
             if (updateAllStatusElement) {
-                updateAllStatusElement.textContent = `Error Comunicación: ${error.message} 🔌`;
+                updateAllStatusElement.textContent = `Sincronización iniciada. Refrescando en ~1 min... 👍`;
+                updateAllStatusElement.className = 'status-success';
+            }
+            alert('Sincronización iniciada. Los ELOs aparecerán automaticamente en ~30-60s.');
+        } else {
+            if (updateAllStatusElement) {
+                updateAllStatusElement.textContent = `Error: ${r.data?.message || ''} ❌`;
                 updateAllStatusElement.className = 'status-error';
             }
-            alert(`Error de Comunicación: ${error.message}. Revisa consola.`);
-        })
-        .finally(() => {
-            // --- Restaurar UI al finalizar ---
-            if (updateAllBtn) {
-                updateAllBtn.disabled = false;
-                updateAllBtn.textContent = 'Actualizar Todos (FIDE)'; // Restaurar texto botón
+            alert(`Error: ${r.data?.message || 'desconocido'}`);
+        }
+    } catch (error) {
+        console.error('Error disparando workflow:', error);
+        if (updateAllStatusElement) {
+            updateAllStatusElement.textContent = `Error: ${error.message} 🔌`;
+            updateAllStatusElement.className = 'status-error';
+        }
+        alert(`Error: ${error.message}`);
+    } finally {
+        if (updateAllBtn) {
+            updateAllBtn.disabled = false;
+            updateAllBtn.textContent = 'Actualizar Todos (FIDE)';
+        }
+        setTimeout(() => {
+            if (updateAllStatusElement) {
+                updateAllStatusElement.style.display = 'none';
             }
-            // Opcional: Ocultar mensaje de estado tras unos segundos
-            setTimeout(() => {
-                if (updateAllStatusElement) {
-                    // Podríamos ocultarlo o simplemente dejar el último estado visible
-                    // updateAllStatusElement.style.display = 'none';
-                }
-            }, 8000); // Ocultar/limpiar después de 8 segundos
-        });
+        }, 8000);
+    }
 }
 
 // Actualiza la interfaz de usuario según el estado de autenticación
@@ -380,8 +349,7 @@ function updateUIForAuthState(user) {
         if (updateAllBtn) updateAllBtn.disabled = true;
 
         // Resetear referencias a Cloud Functions
-        addPlayerByFideIdFunction = null;
-        manualUpdateAllPlayersFunction = null;
+        triggerEloSyncFunction = null;
         console.log("Referencias Cloud Functions reseteadas (logout).");
     }
 }

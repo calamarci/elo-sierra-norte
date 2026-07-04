@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // players: lectura publica, escritura/edicion solo admin autenticado.
+    // Las Cloud Functions usan Admin SDK y bypassan estas reglas.
+    match /players/{playerId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // system_metadata: SOLO accesible desde Cloud Functions (Admin SDK).
+    // El cliente no debe leer ni escribir last_fide_update.
+    match /system_metadata/{docId} {
+      allow read, write: if false;
+    }
+
+    // update_logs: lectura solo admin, escritura denegada al cliente
+    // (las escribe exclusivamente la Cloud Function via Admin SDK).
+    match /update_logs/{logId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

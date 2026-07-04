@@ -34,20 +34,36 @@ function getAllPlayers() {
         });
 }
 
+// Función para añadir un nuevo jugador (placeholder ELO=0; el workflow de GitHub
+// Actions rellenará el ELO real en ~30s al sincronizar con FIDE).
+async function addPlayerByFideIdPlaceholder(fideId) {
+    console.log(`Añadiendo jugador placeholder FIDE ID: ${fideId}`);
+    return db.collection(PLAYERS_COLLECTION).add({
+        fideId: String(fideId),
+        name: `(Pendiente) ${fideId}`,
+        elo: 0,
+        lastUpdated: new Date(),
+    });
+}
+
+// Función para buscar si ya existe un jugador con un FIDE ID dado.
+// Devuelve true si ya existe, false en caso contrario.
+async function playerExistsByFideId(fideId) {
+    console.log(`Comprobando existencia de FIDE ID: ${fideId}`);
+    const snapshot = await db.collection(PLAYERS_COLLECTION)
+        .where('fideId', '==', String(fideId))
+        .limit(1)
+        .get();
+    return !snapshot.empty;
+}
+
 // Función para añadir un nuevo jugador (ya no la usa directamente admin.js)
-// ¡Esta función AHORA MISMO NO SE USA porque usamos la Cloud Function!
-// La dejamos por si acaso o para referencia futura.
 function addPlayer(name, elo) {
     console.warn("Llamada a addPlayer (compat) - ¡Esta función ya no debería usarse directamente desde el frontend!");
     return db.collection(PLAYERS_COLLECTION).add({
         name: name,
         elo: Number(elo),
-        // ¡OJO! El frontend no puede usar FieldValue.serverTimestamp() directamente en compat v9+
-        // Necesitaríamos importar 'serverTimestamp' de 'firebase/firestore/compat' si quisiéramos usarla aquí.
-        // Por simplicidad, o la omitimos o usamos new Date() si es aceptable.
-        // Como no se usa, la comentamos.
-        // lastUpdated: firebase.firestore.FieldValue.serverTimestamp() // <-- Requeriría import específico
-         lastUpdated: new Date() // Usar fecha del cliente si esta función se reactivara
+        lastUpdated: new Date()
     });
 }
 
