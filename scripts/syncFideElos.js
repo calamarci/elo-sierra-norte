@@ -88,22 +88,34 @@ function parseFideTxt(txt) {
 }
 
 // --- Descarga y parsea el ZIP oficial de FIDE ---
+// FIDE sirve el ZIP lentamente; usamos timeout holgado + reintentos.
 async function downloadFideZip() {
-    log(`Descargando ZIP oficial FIDE: ${FIDE_ZIP_URL}`);
-    const response = await axios.get(FIDE_ZIP_URL, {
-        responseType: "arraybuffer",
-        timeout: 120000,
-        maxRedirects: 5,
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0.0.0 Safari/537.36" },
-    });
-    if (response.status !== 200) throw new Error(`FIDE ZIP respondió status ${response.status}`);
-
-    const zip = new AdmZip(Buffer.from(response.data));
-    const txtEntry = zip.getEntries().find(e => e.entryName.endsWith(".txt"));
-    if (!txtEntry) throw new Error("ZIP FIDE no contenía archivo .txt");
-
-    const txt = txtEntry.getData().toString("utf8");
-    return parseFideTxt(txt);
+    const MAX_ATTEMPTS = 3;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        log(`Descargando ZIP oficial FIDE (intento ${attempt}/${MAX_ATTEMPTS}): ${FIDE_ZIP_URL}`);
+        try {
+            const response = await axios.get(FIDE_ZIP_URL, {
+                responseType: "arraybuffer",
+                timeout: 300000,
+                maxRedirects: 5,
+                headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0.0.0 Safari/537.36" },
+            });
+            if (response.status !== 200) throw new Error(`FIDE ZIP respondió status ${response.status}`);
+            const buf = Buffer.from(response.data);
+            log(`ZIP descargado: ${Math.round(buf.length / 1024)} KB`);
+            const zip = new AdmZip(buf);
+            const txtEntry = zip.getEntries().find(e => e.entryName.endsWith(".txt"));
+            if (!txtEntry) throw new Error("ZIP FIDE no contenía archivo .txt");
+            const txt = txtEntry.getData().toString("utf8");
+            return parseFideTxt(txt);
+        } catch (e) {
+            lastErr = e;
+            log(`Intento ${attempt} fallido: ${e.message}`, "error");
+            if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 5000));
+        }
+    }
+    throw lastErr;
 }
 
 // --- Scraping directo de un perfil FIDE (día 1-2) ---
