@@ -233,7 +233,12 @@ async function readPlayers(targetIdsStr) {
 
             if (effectiveMode === "zip" && eloMap) {
                 const entry = eloMap.get(fideId);
-                if (!entry) { errored++; log(`Jugador ${fideId} no encontrado en ZIP FIDE.`); continue; }
+                if (!entry) {
+                    // No encontrado en ZIP = jugador sin rating estándar actualmente (inactivo,
+                    // sin partidas, etc.). Mantenemos ELO existente, NO es un error.
+                    log(`Jugador ${fideId} (${player.name || 'SN'}) no está en ZIP FIDE. Mantiene ELO ${player.elo}.`);
+                    continue;
+                }
                 newName = entry.name || player.name;
                 newElo = entry.elo;
                 valid = newElo >= ELO_MIN && newElo <= ELO_MAX;
